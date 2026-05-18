@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { authApi, setToken, clearToken } from '../lib/api'
 
 interface User {
   id: string
@@ -19,21 +20,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://linda-giant-hero-expansion.trycloudflare.com'
-
-function getToken(): string {
-  return localStorage.getItem('nexusai_token') || ''
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    const token = getToken()
+    const token = localStorage.getItem('nexusai_token') || ''
     if (token) {
-      // Decode token to extract user info (JWT payload)
       try {
         const payload = JSON.parse(atob(token.split('.')[1]))
         setUser({
@@ -44,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           plan: 'professional',
         })
       } catch {
-        localStorage.removeItem('nexusai_token')
+        clearToken()
       }
     }
     setIsLoading(false)
@@ -53,14 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const data = await res.json()
+      const data = await authApi.login(email, password)
       if (data.success && data.data?.token) {
-        localStorage.setItem('nexusai_token', data.data.token)
+        setToken(data.data.token)
         setUser(data.data.user)
         navigate('/dashboard', { replace: true })
       } else {
@@ -72,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = useCallback(() => {
-    localStorage.removeItem('nexusai_token')
+    clearToken()
     setUser(null)
     navigate('/signin', { replace: true })
   }, [navigate])
