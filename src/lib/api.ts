@@ -6,6 +6,8 @@ function getToken(): string {
   return localStorage.getItem('nexusai_token') || ''
 }
 
+const API_TIMEOUT = 1200 // 1.2 seconds
+
 async function api(method: string, path: string, body?: any): Promise<any> {
   // Use relative URL if no API_BASE set (same-origin) or absolute
   const url = API_BASE ? `${API_BASE}${path}` : path
@@ -13,8 +15,12 @@ async function api(method: string, path: string, body?: any): Promise<any> {
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
   try {
-    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
+    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal })
+    clearTimeout(timeoutId)
     const data = await res.json()
     if (data.success) {
       firstError = true
