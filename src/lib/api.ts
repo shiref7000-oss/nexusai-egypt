@@ -102,6 +102,7 @@ export const agentsApi = {
   list: () => apiClient.get('/api/agents'),
   toggle: (agentId: string) => apiClient.post(`/api/agents/${agentId}/toggle`, {}),
   activity: () => apiClient.get('/api/agents/activity'),
+  workflowStatus: () => apiClient.get('/api/agents/workflows/status'),
 }
 export const aiApi = {
   process: (agent: string, prompt: string, context?: any) =>

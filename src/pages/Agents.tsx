@@ -37,6 +37,7 @@ const colorMap: Record<string, { text: string; bg: string; border: string }> = {
 export default function Agents() {
   const [agents, setAgents] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
+  const [workflowStatus, setWorkflowStatus] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
@@ -50,12 +51,14 @@ export default function Agents() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [agentsRes, actRes] = await Promise.all([
+      const [agentsRes, actRes, wfRes] = await Promise.all([
         agentsApi.list(),
         agentsApi.activity(),
+        agentsApi.workflowStatus(),
       ])
       if (agentsRes.success) setAgents(agentsRes.data || [])
       if (actRes.success) setActivity(actRes.data || [])
+      if (wfRes.success) setWorkflowStatus(wfRes.data || [])
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -179,6 +182,46 @@ export default function Agents() {
               )
             })}
           </div>
+
+          {/* n8n Workflow Status */}
+          <Card className="bg-[#0d1321] border-white/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">n8n Automation Workflows</h3>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-[10px] text-green-400">Live</span>
+                </div>
+              </div>
+              {workflowStatus.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4">Workflow status unavailable</p>
+              ) : (
+                <div className="space-y-2">
+                  {workflowStatus.map((wf: any) => (
+                    <div key={wf.path} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${wf.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
+                        <div>
+                          <p className="text-xs text-gray-300 font-medium">{wf.name}</p>
+                          <p className="text-[10px] text-gray-500">{wf.path}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${wf.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                          {wf.status === 'active' ? 'Active' : 'Error'}
+                        </span>
+                        {wf.lastRun && (
+                          <p className="text-[9px] text-gray-500 mt-1">
+                            {new Date(wf.lastRun).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Activity Feed */}
           <Card className="bg-[#0d1321] border-white/5">
