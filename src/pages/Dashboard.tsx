@@ -1,20 +1,17 @@
-import { useNavigate } from 'react-router-dom'
 import {
-  DollarSign, ShoppingCart, Users, Truck, Target, MessageCircle,
-  Activity, CreditCard, Clock, BarChart3, Brain
+  DollarSign, ShoppingCart, Target, Truck, CreditCard,
+  BarChart3, MessageCircle, Clock, ArrowUpRight, ArrowDownRight,
+  AlertTriangle, CheckCircle2, Package
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useState, useEffect } from 'react'
 import { analyticsApi } from '@/lib/api'
+import AppLayout from '@/components/layout/AppLayout'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts'
-
-interface KPI {
-  title: string; value: string; change: string; trend: 'up' | 'down'; icon: any; subtitle: string;
-}
 
 const revenueData = [
   { name: 'Week 1', revenue: 145000, adSpend: 28000 },
@@ -28,134 +25,113 @@ const orderStatusColors: Record<string, string> = {
   Delivered: '#06b6d4', Confirmed: '#3b82f6', Pending: '#f59e0b', Returned: '#ef4444', Cancelled: '#6b7280',
 }
 
-const sidebarItems = [
-  { icon: Activity, label: 'Dashboard', active: true, path: '/dashboard' },
-  { icon: ShoppingCart, label: 'Orders', active: false, path: '/orders' },
-  { icon: Brain, label: 'AI Agents', active: false, path: '/agents' },
-  { icon: BarChart3, label: 'Analytics', active: false, path: '/analytics' },
+const kpiMeta = [
+  { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, subtitle: 'vs last month', format: (v: number) => `EGP ${(v || 0).toLocaleString()}`, changeKey: 'revenueChange' },
+  { key: 'activeOrders', title: 'Active Orders', icon: ShoppingCart, subtitle: 'total orders', format: (v: number) => `${v || 0}`, changeKey: 'ordersChange' },
+  { key: 'confirmationRate', title: 'Confirmation Rate', icon: Target, subtitle: 'target: 80%', format: (v: number) => `${v || 0}%`, changeKey: 'confirmationChange' },
+  { key: 'deliveryRate', title: 'Delivery Rate', icon: Truck, subtitle: 'of confirmed', format: (v: number) => `${v || 0}%`, changeKey: 'deliveryChange' },
+  { key: 'metaAdSpend', title: 'Meta Ad Spend', icon: CreditCard, subtitle: 'this month', format: (v: number) => `EGP ${(v || 0).toLocaleString()}`, changeKey: 'adSpendChange' },
+  { key: 'roas', title: 'ROAS', icon: BarChart3, subtitle: 'avg. return', format: (v: number) => `${v || 0}x`, changeKey: 'roasChange' },
+  { key: 'whatsappMessages', title: 'WhatsApp Msgs', icon: MessageCircle, subtitle: 'this week', format: (v: number) => `${(v || 0).toLocaleString()}`, changeKey: 'whatsappChange' },
+  { key: 'avgFulfillment', title: 'Avg Fulfillment', icon: Clock, subtitle: 'delivery avg', format: (v: number) => `${v || 0} days`, changeKey: 'fulfillmentChange' },
 ]
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const [kpis, setKpis] = useState<KPI[]>([])
+  const [kpis, setKpis] = useState<Record<string, number>>({})
   const [orderStatus, setOrderStatus] = useState<any[]>([])
   const [activity, setActivity] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      try {
-        const kpiRes = await analyticsApi.kpis()
-        if (kpiRes.success && kpiRes.data) {
-          const d = kpiRes.data
-          setKpis([
-            { title: 'Total Revenue', value: `EGP ${d.totalRevenue?.toLocaleString() || 0}`, change: `${d.revenueChange > 0 ? '+' : ''}${d.revenueChange}%`, trend: d.revenueChange > 0 ? 'up' : 'down', icon: DollarSign, subtitle: 'vs last month' },
-            { title: 'Active Orders', value: `${d.activeOrders || 0}`, change: `${d.ordersChange > 0 ? '+' : ''}${d.ordersChange}%`, trend: d.ordersChange > 0 ? 'up' : 'down', icon: ShoppingCart, subtitle: 'total orders' },
-            { title: 'Confirmation Rate', value: `${d.confirmationRate || 0}%`, change: `${d.confirmationChange > 0 ? '+' : ''}${d.confirmationChange}%`, trend: d.confirmationChange > 0 ? 'up' : 'down', icon: Target, subtitle: 'target: 80%' },
-            { title: 'Delivery Rate', value: `${d.deliveryRate || 0}%`, change: `${d.deliveryChange > 0 ? '+' : ''}${d.deliveryChange}%`, trend: d.deliveryChange > 0 ? 'up' : 'down', icon: Truck, subtitle: 'of confirmed' },
-            { title: 'Meta Ad Spend', value: `EGP ${d.metaAdSpend?.toLocaleString() || 0}`, change: `${d.adSpendChange > 0 ? '+' : ''}${d.adSpendChange}%`, trend: d.adSpendChange > 0 ? 'up' : 'down', icon: CreditCard, subtitle: 'this month' },
-            { title: 'ROAS', value: `${d.roas || 0}x`, change: `+${d.roasChange}x`, trend: 'up', icon: BarChart3, subtitle: 'avg. return' },
-            { title: 'WhatsApp Messages', value: `${d.whatsappMessages?.toLocaleString() || 0}`, change: `+${d.whatsappChange}%`, trend: 'up', icon: MessageCircle, subtitle: 'this week' },
-            { title: 'Avg. Fulfillment', value: `${d.avgFulfillment || 0} days`, change: `${d.fulfillmentChange} days`, trend: 'up', icon: Clock, subtitle: 'delivery avg' },
-          ])
-        }
-
-        const statusRes = await analyticsApi.orderStatus()
-        if (statusRes.success) setOrderStatus(statusRes.data || [])
-
-        const actRes = await analyticsApi.activity()
-        if (actRes.success) setActivity(actRes.data || [])
-      } catch (e) {
-        console.error('Dashboard load error:', e)
-      }
-      setLoading(false)
-    }
     loadData()
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('nexusai_token')
-    navigate('/signin')
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [kpiRes, statusRes, actRes] = await Promise.all([
+        analyticsApi.kpis(),
+        analyticsApi.orderStatus(),
+        analyticsApi.activity(),
+      ])
+      if (kpiRes.success) setKpis(kpiRes.data || {})
+      if (statusRes.success) setOrderStatus(statusRes.data || [])
+      if (actRes.success) setActivity(actRes.data || [])
+    } catch (e) {
+      console.error('Dashboard load error:', e)
+    }
+    setLoading(false)
   }
 
+  const recentActivity = activity.slice(0, 5).map((act: any) => {
+    let icon = Package
+    let color = 'text-gray-400'
+    let bg = 'bg-white/5'
+    if (act.status === 'success') { icon = CheckCircle2; color = 'text-green-400'; bg = 'bg-green-500/10' }
+    else if (act.status === 'warning') { icon = AlertTriangle; color = 'text-amber-400'; bg = 'bg-amber-500/10' }
+    else if (act.status === 'error') { icon = AlertTriangle; color = 'text-red-400'; bg = 'bg-red-500/10' }
+    return { ...act, icon, color, bg }
+  })
+
   return (
-    <div className="min-h-screen bg-[#060B18] text-white flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0a0f1a] border-r border-white/5 fixed h-full hidden lg:flex flex-col">
-        <div className="p-4 flex items-center gap-2 border-b border-white/5">
-          <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
-            <Activity className="w-4 h-4 text-white" />
+    <AppLayout title="Dashboard" subtitle="Real-time overview of your e-commerce operations">
+      {loading ? (
+        <>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="bg-[#0d1321] border-white/5">
+                <CardContent className="p-4 space-y-3">
+                  <Skeleton className="h-9 w-9 rounded-lg bg-white/5" />
+                  <Skeleton className="h-7 w-24 bg-white/5" />
+                  <Skeleton className="h-4 w-16 bg-white/5" />
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <span className="text-lg font-bold">NexusAI</span>
-        </div>
-        <nav className="flex-1 p-3 space-y-1">
-          {sidebarItems.map(item => (
-            <button key={item.label} onClick={() => navigate(item.path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${item.active ? 'bg-cyan-500/10 text-cyan-400' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-              <item.icon className="w-4 h-4" />{item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-white/5">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-            <Users className="w-4 h-4" />Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 lg:ml-64">
-        <header className="sticky top-0 z-30 bg-[#060B18]/80 backdrop-blur-lg border-b border-white/5 px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Dashboard</h1>
-            <p className="text-xs text-gray-500">Real-time overview of your operations</p>
+          <div className="grid lg:grid-cols-3 gap-4">
+            <Card className="lg:col-span-2 bg-[#0d1321] border-white/5"><CardContent className="p-4"><Skeleton className="h-[240px] w-full bg-white/5" /></CardContent></Card>
+            <Card className="bg-[#0d1321] border-white/5"><CardContent className="p-4"><Skeleton className="h-[240px] w-full bg-white/5" /></CardContent></Card>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-green-500/10 rounded-full px-3 py-1.5">
-              <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-xs text-green-400">Live</span>
-            </div>
-            <Button onClick={() => navigate('/')} variant="ghost" size="sm" className="text-gray-400 hover:text-white">Exit</Button>
-          </div>
-        </header>
-
-        <div className="p-6 space-y-6">
-          {loading && <div className="text-center py-12 text-gray-500">Loading dashboard data...</div>}
-
+        </>
+      ) : (
+        <>
           {/* KPI Grid */}
-          {!loading && kpis.length > 0 && (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              {kpis.map(kpi => (
-                <Card key={kpi.title} className="bg-[#0d1321] border-white/5 hover:border-cyan-500/20 transition-all">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-9 h-9 bg-cyan-500/10 rounded-lg flex items-center justify-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {kpiMeta.map((kpi) => {
+              const value = kpis[kpi.key] || 0
+              const change = (kpis as any)[kpi.changeKey] || 0
+              const isUp = change > 0
+              return (
+                <Card key={kpi.key} className="bg-[#0d1321] border-white/5 hover:border-white/10 transition-all">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-start justify-between mb-2.5">
+                      <div className="w-8 h-8 bg-cyan-500/10 rounded-lg flex items-center justify-center">
                         <kpi.icon className="w-4 h-4 text-cyan-400" />
                       </div>
-                      <span className={`text-xs ${kpi.trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>
-                        {kpi.change}
-                      </span>
+                      <div className={`flex items-center gap-0.5 text-[11px] font-medium ${isUp ? 'text-green-400' : change < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                        {isUp ? <ArrowUpRight className="w-3 h-3" /> : change < 0 ? <ArrowDownRight className="w-3 h-3" /> : null}
+                        {change > 0 ? '+' : ''}{change}
+                      </div>
                     </div>
-                    <div className="text-2xl font-bold text-white mb-0.5">{kpi.value}</div>
-                    <div className="text-xs text-gray-500">{kpi.subtitle}</div>
+                    <div className="text-lg sm:text-xl font-bold text-white leading-tight">{kpi.format(value)}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{kpi.subtitle}</div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
+              )
+            })}
+          </div>
 
           {/* Charts Row */}
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-2 bg-[#0d1321] border-white/5">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 px-4 pt-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Revenue vs Ad Spend</CardTitle>
-                  <span className="text-xs text-gray-500">This Month</span>
+                  <CardTitle className="text-sm font-semibold">Revenue vs Ad Spend</CardTitle>
+                  <span className="text-[11px] text-gray-500">This Month</span>
                 </div>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={240}>
+              <CardContent className="px-4 pb-4">
+                <ResponsiveContainer width="100%" height={220}>
                   <AreaChart data={revenueData}>
                     <defs>
                       <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
@@ -164,34 +140,36 @@ export default function Dashboard() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#475569" fontSize={12} />
-                    <YAxis stroke="#475569" fontSize={12} tickFormatter={(v) => `${v / 1000}k`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0d1321', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                    <Area type="monotone" dataKey="revenue" stroke="#06b6d4" fill="url(#revGrad)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="adSpend" stroke="#3b82f6" fill="transparent" strokeWidth={2} strokeDasharray="4 4" />
+                    <XAxis dataKey="name" stroke="#475569" fontSize={11} />
+                    <YAxis stroke="#475569" fontSize={11} tickFormatter={(v) => `${v / 1000}k`} />
+                    <Tooltip contentStyle={{ backgroundColor: '#0d1321', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#06b6d4" fill="url(#revGrad)" strokeWidth={2} name="Revenue" />
+                    <Area type="monotone" dataKey="adSpend" stroke="#3b82f6" fill="transparent" strokeWidth={2} strokeDasharray="4 4" name="Ad Spend" />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0d1321] border-white/5">
-              <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Order Status</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
+              <CardHeader className="pb-2 px-4 pt-4">
+                <CardTitle className="text-sm font-semibold">Order Status</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
-                    <Pie data={orderStatus} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                    <Pie data={orderStatus} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
                       {orderStatus.map((entry, i) => (
                         <Cell key={i} fill={orderStatusColors[entry.name] || '#06b6d4'} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0d1321', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#0d1321', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="flex flex-wrap gap-2 justify-center mt-2">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
                   {orderStatus.map(s => (
-                    <div key={s.name} className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                      <span className="text-xs text-gray-400">{s.name}</span>
+                    <div key={s.name} className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                      <span className="text-[11px] text-gray-400">{s.name}</span>
                     </div>
                   ))}
                 </div>
@@ -201,24 +179,33 @@ export default function Dashboard() {
 
           {/* Activity */}
           <Card className="bg-[#0d1321] border-white/5">
-            <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">AI Agent Activity</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {activity.length === 0 && <p className="text-sm text-gray-500">No recent activity</p>}
-              {activity.slice(0, 5).map((act: any, i: number) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${act.status === 'success' ? 'bg-green-500/10' : act.status === 'warning' ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
-                    <Activity className={`w-4 h-4 ${act.status === 'success' ? 'text-green-400' : act.status === 'warning' ? 'text-amber-400' : 'text-red-400'}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-300">{act.action}</p>
-                    <p className="text-xs text-gray-500">{new Date(act.created_at).toLocaleTimeString()}</p>
-                  </div>
+            <CardHeader className="pb-2 px-4 pt-4">
+              <CardTitle className="text-sm font-semibold">AI Agent Activity</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4">No recent activity</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.map((act: any, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className={`w-8 h-8 ${act.bg} rounded-lg flex items-center justify-center shrink-0 mt-0.5`}>
+                        <act.icon className={`w-4 h-4 ${act.color}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-300 truncate">{act.action}</p>
+                        <p className="text-[11px] text-gray-500">
+                          {act.agent_name} — {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
-        </div>
-      </main>
-    </div>
+        </>
+      )}
+    </AppLayout>
   )
 }
