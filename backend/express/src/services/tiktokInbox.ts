@@ -6,6 +6,7 @@ let browser: any = null;
 let context: any = null;
 let polling = false;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+let currentStorageState: any = null;
 
 const TIKTOK_BASE = 'https://www.tiktok.com';
 const POLL_INTERVAL_MS = parseInt(process.env.TIKTOK_POLL_INTERVAL_MS || '15000', 10);
@@ -31,16 +32,21 @@ async function ensureBrowser() {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
     });
 
-    // Try to restore existing session
+    // Try managed session first, then fall back to file
     let storageState: any = undefined;
-    try {
-      const fs = await import('fs');
-      if (fs.existsSync(SESSION_PATH)) {
-        storageState = SESSION_PATH;
-        logger.info('TikTok worker: loaded stored session');
+    if (currentStorageState) {
+      storageState = currentStorageState;
+      logger.info('TikTok worker: using managed session');
+    } else {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(SESSION_PATH)) {
+          storageState = SESSION_PATH;
+          logger.info('TikTok worker: loaded stored session from file');
+        }
+      } catch {
+        // no stored session
       }
-    } catch {
-      // no stored session, fresh start
     }
 
     context = await browser.newContext({
@@ -56,6 +62,26 @@ async function ensureBrowser() {
     logger.error('TikTok worker: browser launch failed', { error: err.message });
     throw err;
   }
+}
+
+// ── Update session from manager ──
+
+export async function updateSession(storageState: any): Promise<void> {
+  currentStorageState = storageState;
+
+  // Reload browser context with new session
+  if (context) {
+    try { await context.close(); } catch { /* ignore */ }
+    context = null;
+  }
+  if (browser) {
+    try { await browser.close(); } catch { /* ignore */ }
+    browser = null;
+  }
+
+  // Recreate context with new session
+  await ensureBrowser();
+  logger.info('TikTok worker: session updated from manager');
 }
 
 // ── Session persistence ──

@@ -774,6 +774,86 @@ export const tikTokInboxApi = {
     ),
 };
 
+// ── TikTok Connect (Session Management) ──
+
+export interface TikTokSessionStatus {
+  connected: boolean;
+  sessionId: number | null;
+  username: string | null;
+  lastLoginAt: string | null;
+  lastHealthAt: string | null;
+  status: string;
+  errorMessage: string | null;
+  browserActive: boolean;
+}
+
+export interface TikTokAuditEvent {
+  id: number;
+  session_id: number | null;
+  account_id: number;
+  event_type: string;
+  details: any;
+  created_at: string;
+}
+
+export const tikTokConnectApi = {
+  sessionStatus: () =>
+    apiFetch<{ success: boolean; data: TikTokSessionStatus }>(
+      adminPath('/tiktok/session')
+    ),
+
+  connect: () =>
+    apiFetch<{ success: boolean; data: { sessionId: number; screenshot: string; currentUrl: string } }>(
+      adminPath('/tiktok/connect'),
+      { method: 'POST' }
+    ),
+
+  screenshot: () =>
+    apiFetch<{ success: boolean; data: { screenshot: string; currentUrl: string } }>(
+      adminPath('/tiktok/screenshot')
+    ),
+
+  click: (x: number, y: number) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/click'),
+      { method: 'POST', body: JSON.stringify({ x, y }) }
+    ),
+
+  type: (text: string) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/type'),
+      { method: 'POST', body: JSON.stringify({ text }) }
+    ),
+
+  key: (key: string) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/key'),
+      { method: 'POST', body: JSON.stringify({ key }) }
+    ),
+
+  checkLogin: () =>
+    apiFetch<{ success: boolean; data: { loggedIn: boolean; username: string | null; url: string } }>(
+      adminPath('/tiktok/check-login')
+    ),
+
+  disconnect: () =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/disconnect'),
+      { method: 'POST' }
+    ),
+
+  healthCheck: () =>
+    apiFetch<{ success: boolean; data: { healthy: boolean } }>(
+      adminPath('/tiktok/health-check'),
+      { method: 'POST' }
+    ),
+
+  auditLog: () =>
+    apiFetch<{ success: boolean; data: { events: TikTokAuditEvent[] } }>(
+      adminPath('/tiktok/audit')
+    ),
+};
+
 /** Map UI plan label to API value (DB uses `starter` for Basic). */
 export function planToApi(plan: AdminPlan): string {
   if (plan === 'basic') return 'starter';

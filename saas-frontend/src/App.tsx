@@ -41,6 +41,7 @@ import WhatsAppPage from '@/pages/WhatsApp';
 import CostAnalyzerPage from '@/pages/CostAnalyzer';
 import ContentAgentPage from '@/pages/ContentAgent';
 import TikTokInboxPage from '@/pages/admin/TikTokInbox';
+import TikTokConnectPage from '@/pages/admin/TikTokConnect';
 
 function CatchAll() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -194,6 +195,14 @@ function AppRoutes() {
           element={
             <AdminGuard>
               <TikTokInboxPage />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/channels/tiktok"
+          element={
+            <AdminGuard>
+              <TikTokConnectPage />
             </AdminGuard>
           }
         />

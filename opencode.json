@@ -1,0 +1,94 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "token-optimizer",
+  "instructions": ["AGENTS.md"],
+  "skills": {
+    "paths": [".opencode/skills"]
+  },
+  "model": "opencode-go/deepseek-v4-pro",
+  "small_model": "opencode-go/deepseek-v4-pro",
+  "agent": {
+    "token-optimizer": {
+      "mode": "primary",
+      "description": "First responder. Finds relevant files, estimates token cost, compresses context, and routes to the correct subagent. Use ONLY the cheapest model.",
+      "color": "#4A90D9"
+    },
+    "architect": {
+      "mode": "subagent",
+      "description": "System architecture, database design, API contracts, implementation plans, and task decomposition. Use ONLY for complex design work.",
+      "color": "#7B2FBE"
+    },
+    "developer": {
+      "mode": "subagent",
+      "description": "Implementation: backend services, frontend components, database migrations, workers, and all code changes.",
+      "color": "#2E7D32"
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Reviews git diff only. Checks security, performance, maintainability. Blocks dangerous changes.",
+      "color": "#E65100",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "*": "deny"
+        }
+      }
+    },
+    "qa": {
+      "mode": "subagent",
+      "description": "Verification: build checks, API tests, UI validation, workflow validation. Read-only.",
+      "color": "#00838F",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "npm*": "allow",
+          "npx*": "allow",
+          "node*": "allow",
+          "curl*": "allow",
+          "git diff*": "allow",
+          "git status*": "allow",
+          "pm2*": "allow",
+          "*": "deny"
+        }
+      }
+    },
+    "deploy": {
+      "mode": "subagent",
+      "description": "Deployment gate: checklist, health checks, migration verification, approval gate. Read-only safety checks.",
+      "color": "#C62828",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "pm2 list*": "allow",
+          "pm2 show*": "allow",
+          "pm2 logs*": "allow",
+          "curl*": "allow",
+          "docker ps*": "allow",
+          "docker inspect*": "allow",
+          "git log*": "allow",
+          "git diff*": "allow",
+          "git status*": "allow",
+          "systemctl*": "allow",
+          "df*": "allow",
+          "free*": "allow",
+          "uptime*": "allow",
+          "*": "deny"
+        }
+      }
+    }
+  },
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "git *": "allow",
+      "mkdir *": "allow",
+      "ls *": "allow",
+      "echo *": "allow",
+      "rm *": "ask",
+      "*": "ask"
+    }
+  }
+}
