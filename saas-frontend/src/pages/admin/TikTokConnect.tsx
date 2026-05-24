@@ -3,6 +3,7 @@ import { tikTokConnectApi, type TikTokSessionStatus, type TikTokAuditEvent } fro
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
+import { RefreshCw, ArrowLeft, ArrowRight, RotateCcw, Trash2, LogIn } from 'lucide-react';
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -23,10 +24,11 @@ export default function TikTokConnectPage() {
   const [auditEvents, setAuditEvents] = useState<TikTokAuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
-  const [inputText, setInputText] = useState('');
   const [loginChecked, setLoginChecked] = useState(false);
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loginPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -59,7 +61,6 @@ export default function TikTokConnectPage() {
         setLoginChecked(true);
         toast.success(`Logged in as @${res.data.username || 'unknown'}! Session saved.`);
         await loadStatus();
-        // Clear login poll
         if (loginPollRef.current) clearInterval(loginPollRef.current);
       }
     } catch { /* silent */ }
@@ -73,7 +74,6 @@ export default function TikTokConnectPage() {
     };
   }, [loadStatus]);
 
-  // Start screenshot + login polling when connected
   useEffect(() => {
     if (status?.browserActive && !loginChecked) {
       pollRef.current = setInterval(loadScreenshot, 1500);
@@ -93,7 +93,7 @@ export default function TikTokConnectPage() {
         setScreenshot(res.data.screenshot);
         setLoginChecked(false);
         await loadStatus();
-        toast.success('Browser launched. Log into TikTok in the viewer below.');
+        toast.success('Browser launched. Click inside the viewer and type directly.');
       }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to launch browser');
@@ -114,45 +114,116 @@ export default function TikTokConnectPage() {
     }
   };
 
-  const handleScreenshotClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+  // ── Direct mouse click on screenshot ──
+
+  const handleViewerClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!status?.browserActive) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const naturalW = 1280;
-    const naturalH = 800;
-    const scaleX = naturalW / rect.width;
-    const scaleY = naturalH / rect.height;
+    const scaleX = 1280 / rect.width;
+    const scaleY = 800 / rect.height;
     const x = Math.round((e.clientX - rect.left) * scaleX);
     const y = Math.round((e.clientY - rect.top) * scaleY);
-    try {
-      await tikTokConnectApi.click(x, y);
-    } catch { /* silent */ }
+    try { await tikTokConnectApi.click(x, y); } catch { /* */ }
+    // Focus the viewer for keyboard capture
+    viewerRef.current?.focus();
+    setKeyboardFocused(true);
   };
 
-  const handleType = async () => {
-    if (!inputText.trim()) return;
-    try {
-      await tikTokConnectApi.type(inputText);
-      setInputText('');
-    } catch {
-      toast.error('Failed to send input');
+  // ── Scroll support ──
+
+  const handleViewerWheel = async (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!status?.browserActive) return;
+    e.preventDefault();
+    try { await tikTokConnectApi.scroll(e.deltaY); } catch { /* */ }
+  };
+
+  // ── Direct keyboard capture ──
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!status?.browserActive) return;
+    e.stopPropagation();
+
+    // Handle special keys
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      try { await tikTokConnectApi.key('Enter'); } catch { /* */ }
+      return;
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      try { await tikTokConnectApi.key('Tab'); } catch { /* */ }
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      try { await tikTokConnectApi.key('Backspace'); } catch { /* */ }
+      return;
+    }
+    if (e.key === 'Escape') {
+      try { await tikTokConnectApi.key('Escape'); } catch { /* */ }
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      try { await tikTokConnectApi.key(e.key); } catch { /* */ }
+      return;
+    }
+
+    // Ctrl+V paste
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      e.preventDefault();
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) await tikTokConnectApi.paste(text);
+      } catch { /* */ }
+      return;
+    }
+
+    // Ctrl+A select all
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      try { await tikTokConnectApi.key('Control+a'); } catch { /* */ }
+      return;
+    }
+
+    // Forward printable characters
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      try { await tikTokConnectApi.type(e.key); } catch { /* */ }
     }
   };
 
-  const handleKey = async (key: string) => {
-    try {
-      await tikTokConnectApi.key(key);
-    } catch { /* silent */ }
-  };
+  // ── Toolbar actions ──
 
-  const handleFocusField = async (field: 'email' | 'password' | 'login-button') => {
-    try {
-      await tikTokConnectApi.focusField(field);
-    } catch { /* silent */ }
+  const handleRefresh = async () => {
+    try { await tikTokConnectApi.refresh(); toast.success('Page refreshed'); } catch { toast.error('Refresh failed'); }
   };
-
-  const handleReconnect = async () => {
-    await handleDisconnect();
-    setTimeout(() => handleConnect(), 500);
+  const handleBack = async () => {
+    try { await tikTokConnectApi.back(); } catch { toast.error('Back failed'); }
+  };
+  const handleForward = async () => {
+    try { await tikTokConnectApi.forward(); } catch { toast.error('Forward failed'); }
+  };
+  const handleNavigateLogin = async () => {
+    try { await tikTokConnectApi.navigate('https://www.tiktok.com/login'); toast.success('Navigated to login'); } catch { toast.error('Navigate failed'); }
+  };
+  const handleClearCookies = async () => {
+    try {
+      await tikTokConnectApi.clearCookies();
+      setLoginChecked(false);
+      toast.success('Cookies cleared, returned to login page');
+    } catch { toast.error('Clear cookies failed'); }
+  };
+  const handleRestart = async () => {
+    setConnecting(true);
+    try {
+      const res = await tikTokConnectApi.restart();
+      if (res.success) {
+        setScreenshot(res.data.screenshot);
+        setLoginChecked(false);
+        await loadStatus();
+        toast.success('Browser session restarted');
+      }
+    } catch { toast.error('Restart failed'); } finally { setConnecting(false); }
   };
 
   if (loading) return <div className="p-6 text-subtle">Loading...</div>;
@@ -170,8 +241,8 @@ export default function TikTokConnectPage() {
             <div className="flex gap-2">
               {isConnected ? (
                 <>
-                  <Button size="sm" variant="outline" onClick={handleReconnect}>
-                    Reconnect
+                  <Button size="sm" variant="outline" onClick={handleRestart} disabled={connecting}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restart
                   </Button>
                   <Button size="sm" variant="default" onClick={handleDisconnect}>
                     Disconnect
@@ -190,9 +261,7 @@ export default function TikTokConnectPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div>
                 <span className="text-subtle">Status</span>
-                <div className="mt-1">
-                  <StatusBadge status={status.status} />
-                </div>
+                <div className="mt-1"><StatusBadge status={status.status} /></div>
               </div>
               <div>
                 <span className="text-subtle">Username</span>
@@ -207,9 +276,7 @@ export default function TikTokConnectPage() {
               <div>
                 <span className="text-subtle">Browser</span>
                 <p className="font-medium">
-                  <span
-                    className={`inline-block w-2 h-2 rounded-full ${status.browserActive ? 'bg-emerald-500' : 'bg-slate-500'}`}
-                  />{' '}
+                  <span className={`inline-block w-2 h-2 rounded-full ${status.browserActive ? 'bg-emerald-500' : 'bg-slate-500'}`} />{' '}
                   {status.browserActive ? 'Active' : 'Inactive'}
                 </p>
               </div>
@@ -223,80 +290,73 @@ export default function TikTokConnectPage() {
         </CardBody>
       </Card>
 
-      {/* Remote Browser Viewer */}
+      {/* Remote Browser with Toolbar */}
       {isConnected && !loginChecked && (
         <Card>
           <CardHeader
-            title="Remote Browser — TikTok Login"
-            description="Use the input below to type into TikTok fields. Click a field button first, then type and press Send."
+            title="Remote Browser"
+            description={
+              keyboardFocused
+                ? 'Keyboard active — type directly. Click outside to release.'
+                : 'Click inside the browser to activate keyboard input.'
+            }
+            action={
+              <div className="flex gap-1 flex-wrap">
+                <Button size="sm" variant="outline" onClick={handleBack} title="Back">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleForward} title="Forward">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleRefresh} title="Refresh">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleNavigateLogin} title="Go to Login">
+                  <LogIn className="h-3.5 w-3.5 mr-1" />Login
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleClearCookies} title="Clear Cookies">
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />Clear
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleRestart} title="Restart Session">
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />Restart
+                </Button>
+              </div>
+            }
           />
           <CardBody>
-            <div className="space-y-3">
-              {/* Step 1: Focus a field */}
-              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 1 — Click a field to focus it</p>
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="outline" onClick={() => handleFocusField('email')}>
-                  Click Email/Username
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleFocusField('password')}>
-                  Click Password
-                </Button>
-                <Button size="sm" variant="default" onClick={() => handleFocusField('login-button')}>
-                  Click Login
-                </Button>
-              </div>
-
-              {/* Step 2: Type and send */}
-              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 2 — Type into the focused field</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Type your username/password here..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleType();
-                  }}
-                  className="flex-1 h-10 rounded-md border-2 border-zinc-600 bg-zinc-900 px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-400"
+            <div
+              ref={viewerRef}
+              tabIndex={0}
+              className="relative border-2 border-zinc-600 rounded-lg overflow-hidden bg-black cursor-crosshair outline-none"
+              style={{ aspectRatio: '1280/800', maxHeight: '55vh' }}
+              onClick={handleViewerClick}
+              onWheel={handleViewerWheel}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setKeyboardFocused(true)}
+              onBlur={() => setKeyboardFocused(false)}
+            >
+              {screenshot ? (
+                <img
+                  src={screenshot}
+                  alt="TikTok browser"
+                  className="w-full h-full object-contain select-none"
+                  draggable={false}
                 />
-                <Button size="sm" onClick={handleType} className="h-10 px-6">
-                  Send
-                </Button>
-              </div>
-
-              {/* Step 3: Navigation keys */}
-              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 3 — Use keyboard shortcuts</p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleKey('Tab')}>Tab</Button>
-                <Button size="sm" variant="outline" onClick={() => handleKey('Enter')}>Enter</Button>
-                <Button size="sm" variant="outline" onClick={() => handleKey('Escape')}>Esc</Button>
-              </div>
-
-              {/* Screenshot display (below controls) */}
-              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Browser View</p>
-              <div
-                className="relative border border-white/10 rounded-lg overflow-hidden bg-black cursor-crosshair"
-                style={{ aspectRatio: '1280/800', maxHeight: '40vh' }}
-                onClick={handleScreenshotClick}
-              >
-                {screenshot ? (
-                  <img
-                    src={screenshot}
-                    alt="TikTok browser"
-                    className="w-full h-full object-contain"
-                    draggable={false}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-subtle">
-                    Loading browser view...
-                  </div>
-                )}
-              </div>
-
-              <p className="text-xs text-zinc-500">
-                After logging in, the session is detected automatically within ~3 seconds.
-              </p>
+              ) : (
+                <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+                  Loading browser view...
+                </div>
+              )}
+              {keyboardFocused && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-emerald-500/90 text-white text-xs px-2 py-0.5 rounded-full z-10">
+                  Keyboard Active
+                </div>
+              )}
             </div>
+            <p className="text-xs text-zinc-500 mt-2 text-center">
+              Click inside the browser to activate direct keyboard input. Your keystrokes are sent to TikTok.
+              Supports: typing, Enter, Tab, Backspace, arrows, Ctrl+V paste, Ctrl+A select all.
+            </p>
           </CardBody>
         </Card>
       )}

@@ -440,6 +440,88 @@ export async function loadSessionForWorker(accountId: number): Promise<{
   }
 }
 
+// ── Browser controls ──
+
+export async function refreshPage(sessionId: number): Promise<{ url: string }> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
+  return { url: session.page.url() };
+}
+
+export async function navigateTo(sessionId: number, url: string): Promise<{ url: string }> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  return { url: session.page.url() };
+}
+
+export async function goBack(sessionId: number): Promise<{ url: string }> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
+  return { url: session.page.url() };
+}
+
+export async function goForward(sessionId: number): Promise<{ url: string }> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.goForward({ waitUntil: 'domcontentloaded', timeout: 10000 });
+  return { url: session.page.url() };
+}
+
+export async function restartSession(sessionId: number, accountId: number): Promise<{ sessionId: number; screenshot: string; currentUrl: string }> {
+  // Close existing browser
+  const existing = activeSessions.get(sessionId);
+  if (existing) {
+    try { await existing.context?.close(); } catch { /* */ }
+    try { await existing.browser?.close(); } catch { /* */ }
+    activeSessions.delete(sessionId);
+    lastScreenshots.delete(sessionId);
+  }
+
+  // Mark old session disconnected
+  try { await db.updateSessionStatus(sessionId, 'disconnected'); } catch { /* */ }
+
+  // Create fresh session
+  return createSession(accountId);
+}
+
+export async function clearCookies(sessionId: number): Promise<void> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.context.clearCookies();
+  // Navigate to login page fresh
+  await session.page.goto(`${TIKTOK_BASE}/login`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 15000,
+  });
+}
+
+export async function scrollPage(sessionId: number, deltaY: number): Promise<void> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.evaluate((dy) => window.scrollBy(0, dy), deltaY);
+}
+
+export async function pasteText(sessionId: number, text: string): Promise<void> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.evaluate((t) => {
+    const el = document.activeElement;
+    if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+      el.focus();
+      const start = el.selectionStart || 0;
+      const end = el.selectionEnd || 0;
+      const before = el.value.slice(0, start);
+      const after = el.value.slice(end);
+      el.value = before + t + after;
+      el.selectionStart = el.selectionEnd = start + t.length;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, text);
+}
+
 // ── Shutdown ──
 
 export async function shutdownAllSessions(): Promise<void> {

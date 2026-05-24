@@ -27,6 +27,14 @@ import {
   sendType,
   sendKey,
   focusField,
+  refreshPage,
+  navigateTo,
+  goBack,
+  goForward,
+  restartSession,
+  clearCookies,
+  scrollPage,
+  pasteText,
   checkLoginStatus,
   saveSessionAfterLogin,
   disconnectSession,
@@ -987,6 +995,100 @@ router.post('/tiktok/focus-field', authenticate, requireRole('admin', 'superadmi
     const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await focusField(status.sessionId, field);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Browser Controls ──
+
+router.post('/tiktok/refresh', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    const result = await refreshPage(status.sessionId);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/navigate', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'url is required' });
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    const result = await navigateTo(status.sessionId, url);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/back', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    const result = await goBack(status.sessionId);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/forward', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    const result = await goForward(status.sessionId);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/restart', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    const result = await restartSession(status.sessionId, req.user!.pgUserId);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/clear-cookies', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    await clearCookies(status.sessionId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/scroll', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { deltaY } = req.body;
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    await scrollPage(status.sessionId, deltaY || 0);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tiktok/paste', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { text } = req.body;
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    await pasteText(status.sessionId, text);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

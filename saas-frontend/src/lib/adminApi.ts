@@ -837,6 +837,54 @@ export const tikTokConnectApi = {
       { method: 'POST', body: JSON.stringify({ field }) }
     ),
 
+  refresh: () =>
+    apiFetch<{ success: boolean; data: { url: string } }>(
+      adminPath('/tiktok/refresh'),
+      { method: 'POST' }
+    ),
+
+  navigate: (url: string) =>
+    apiFetch<{ success: boolean; data: { url: string } }>(
+      adminPath('/tiktok/navigate'),
+      { method: 'POST', body: JSON.stringify({ url }) }
+    ),
+
+  back: () =>
+    apiFetch<{ success: boolean; data: { url: string } }>(
+      adminPath('/tiktok/back'),
+      { method: 'POST' }
+    ),
+
+  forward: () =>
+    apiFetch<{ success: boolean; data: { url: string } }>(
+      adminPath('/tiktok/forward'),
+      { method: 'POST' }
+    ),
+
+  restart: () =>
+    apiFetch<{ success: boolean; data: { sessionId: number; screenshot: string; currentUrl: string } }>(
+      adminPath('/tiktok/restart'),
+      { method: 'POST' }
+    ),
+
+  clearCookies: () =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/clear-cookies'),
+      { method: 'POST' }
+    ),
+
+  scroll: (deltaY: number) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/scroll'),
+      { method: 'POST', body: JSON.stringify({ deltaY }) }
+    ),
+
+  paste: (text: string) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/paste'),
+      { method: 'POST', body: JSON.stringify({ text }) }
+    ),
+
   checkLogin: () =>
     apiFetch<{ success: boolean; data: { loggedIn: boolean; username: string | null; url: string } }>(
       adminPath('/tiktok/check-login')
