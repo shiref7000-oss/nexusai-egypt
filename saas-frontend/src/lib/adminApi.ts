@@ -831,6 +831,12 @@ export const tikTokConnectApi = {
       { method: 'POST', body: JSON.stringify({ key }) }
     ),
 
+  focusField: (field: 'email' | 'password' | 'login-button') =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/focus-field'),
+      { method: 'POST', body: JSON.stringify({ field }) }
+    ),
+
   checkLogin: () =>
     apiFetch<{ success: boolean; data: { loggedIn: boolean; username: string | null; url: string } }>(
       adminPath('/tiktok/check-login')

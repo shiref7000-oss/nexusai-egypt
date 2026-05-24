@@ -26,6 +26,7 @@ import {
   sendClick,
   sendType,
   sendKey,
+  focusField,
   checkLoginStatus,
   saveSessionAfterLogin,
   disconnectSession,
@@ -970,6 +971,22 @@ router.post('/tiktok/key', authenticate, requireRole('admin', 'superadmin'), asy
     const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await sendKey(status.sessionId, key);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Focus a specific field (email, password, login-button)
+router.post('/tiktok/focus-field', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { field } = req.body;
+    if (!['email', 'password', 'login-button'].includes(field)) {
+      return res.status(400).json({ success: false, error: 'field must be email, password, or login-button' });
+    }
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    await focusField(status.sessionId, field);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

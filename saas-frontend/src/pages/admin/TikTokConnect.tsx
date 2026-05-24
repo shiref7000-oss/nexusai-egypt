@@ -144,6 +144,12 @@ export default function TikTokConnectPage() {
     } catch { /* silent */ }
   };
 
+  const handleFocusField = async (field: 'email' | 'password' | 'login-button') => {
+    try {
+      await tikTokConnectApi.focusField(field);
+    } catch { /* silent */ }
+  };
+
   const handleReconnect = async () => {
     await handleDisconnect();
     setTimeout(() => handleConnect(), 500);
@@ -246,6 +252,19 @@ export default function TikTokConnectPage() {
                 )}
               </div>
 
+              {/* Form field helpers */}
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="outline" onClick={() => handleFocusField('email')}>
+                  Click Email/Username
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleFocusField('password')}>
+                  Click Password
+                </Button>
+                <Button size="sm" variant="default" onClick={() => handleFocusField('login-button')}>
+                  Click Login
+                </Button>
+              </div>
+
               {/* Input controls */}
               <div className="flex gap-2">
                 <input
@@ -264,7 +283,7 @@ export default function TikTokConnectPage() {
                 <Button size="sm" variant="outline" onClick={() => handleKey('Escape')}>Esc</Button>
               </div>
               <p className="text-xs text-subtle">
-                After logging in, the session is detected automatically and saved within ~3 seconds.
+                Use the buttons above to focus fields, then type below. After logging in, the session is detected automatically within ~3 seconds.
               </p>
             </div>
           </CardBody>

@@ -168,13 +168,41 @@ export async function getSessionCachedScreenshot(sessionId: number): Promise<str
 export async function sendClick(sessionId: number, x: number, y: number): Promise<void> {
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error('Session not active');
+  // Click at coordinates
   await session.page.mouse.click(x, y);
-  await session.page.waitForTimeout(500);
+  await session.page.waitForTimeout(300);
+  // Try to focus whatever is under the cursor
+  try {
+    await session.page.evaluate(({ cx, cy }) => {
+      const el = document.elementFromPoint(cx, cy);
+      if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
+        el.focus();
+      }
+    }, { cx: x, cy: y });
+  } catch { /* best-effort focus */ }
 }
 
 export async function sendType(sessionId: number, text: string): Promise<void> {
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error('Session not active');
+  // Ensure an input is focused before typing
+  const hasFocus = await session.page.evaluate(() => {
+    const el = document.activeElement;
+    return el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement);
+  });
+  if (!hasFocus) {
+    // Try to focus the first visible input
+    await session.page.evaluate(() => {
+      const inputs = document.querySelectorAll('input:not([type="hidden"]), textarea');
+      for (const input of inputs) {
+        if ((input as HTMLElement).offsetParent !== null) {
+          (input as HTMLElement).focus();
+          break;
+        }
+      }
+    });
+    await session.page.waitForTimeout(200);
+  }
   await session.page.keyboard.type(text, { delay: 50 });
 }
 
@@ -182,6 +210,63 @@ export async function sendKey(sessionId: number, key: string): Promise<void> {
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error('Session not active');
   await session.page.keyboard.press(key);
+}
+
+// ── Focused field helpers (reliable for TikTok login) ──
+
+export async function focusField(sessionId: number, fieldType: 'email' | 'password' | 'login-button'): Promise<void> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+
+  if (fieldType === 'login-button') {
+    await session.page.evaluate(() => {
+      const buttons = document.querySelectorAll('button, [role="button"], input[type="submit"]');
+      for (const btn of buttons) {
+        const text = (btn.textContent || '').toLowerCase();
+        if (text.includes('log in') || text.includes('login') || text.includes('sign in')) {
+          (btn as HTMLElement).click();
+          return;
+        }
+      }
+    });
+    return;
+  }
+
+  await session.page.evaluate((type) => {
+    // Try common TikTok login field selectors first
+    const selectors = [
+      `input[type="${type}"]`,
+      `input[name="${type}"]`,
+      `input[placeholder*="${type}" i]`,
+      `input[aria-label*="${type}" i]`,
+      'input:not([type="hidden"]):not([type="submit"]):not([type="checkbox"])',
+    ];
+    for (const sel of selectors) {
+      const inputs = document.querySelectorAll(sel);
+      for (const input of inputs) {
+        const el = input as HTMLElement;
+        if (el.offsetParent !== null && !el.hasAttribute('readonly')) {
+          el.click();
+          el.focus();
+          // Clear existing value so user can type fresh
+          if (el instanceof HTMLInputElement) el.select();
+          return;
+        }
+      }
+    }
+    // Fallback: try all visible inputs
+    const allInputs = document.querySelectorAll('input:not([type="hidden"])');
+    for (const input of allInputs) {
+      const el = input as HTMLElement;
+      if (el.offsetParent !== null) {
+        el.click();
+        el.focus();
+        if (input instanceof HTMLInputElement) input.select();
+        return;
+      }
+    }
+  }, fieldType);
+  await session.page.waitForTimeout(300);
 }
 
 export async function getSessionUrl(sessionId: number): Promise<string> {
