@@ -22,6 +22,8 @@ import {
   Rocket,
   Brain,
   PenLine,
+  Link,
+  Inbox,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -58,6 +60,8 @@ export const adminNav: NavItem[] = [
   { to: '/admin/features', label: 'Feature Flags', icon: Flag, admin: true },
   { to: '/admin/ai-settings', label: 'AI Settings', icon: Cpu, admin: true },
   { to: '/admin/audit', label: 'Audit Logs', icon: FileText, admin: true },
+  { to: '/admin/channels/tiktok', label: 'TikTok Connect', icon: Link, admin: true },
+  { to: '/admin/inbox/tiktok', label: 'TikTok Inbox', icon: Inbox, admin: true },
   { to: '/ai-developer', label: 'AI Developer', icon: Code2, admin: true },
   { to: '/admin/engineering-agent', label: 'Engineering Monitor', icon: Activity, admin: true },
   { to: '/admin/engineering-intelligence', label: 'Engineering Intelligence', icon: Brain, admin: true },
