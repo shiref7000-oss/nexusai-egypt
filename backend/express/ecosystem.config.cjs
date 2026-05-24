@@ -46,5 +46,23 @@ module.exports = {
       merge_logs: true,
       time: true,
     },
+    {
+      name: 'tiktok-worker',
+      cwd: '/var/www/nexusai-api',
+      script: 'dist/tiktok-worker.js',
+      instances: 1,
+      exec_mode: 'fork',
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'production',
+        TIKTOK_WORKER_PORT: 3003,
+        TIKTOK_POLL_INTERVAL_MS: '15000',
+        TIKTOK_SESSION_PATH: '/var/www/nexusai-api/tiktok-session.json',
+      },
+      error_file: '/var/log/nexusai/tiktok-worker-error.log',
+      out_file: '/var/log/nexusai/tiktok-worker-out.log',
+      merge_logs: true,
+      time: true,
+    },
   ],
 };

@@ -40,6 +40,7 @@ import MetaCampaignDetailPage from '@/pages/MetaCampaignDetail';
 import WhatsAppPage from '@/pages/WhatsApp';
 import CostAnalyzerPage from '@/pages/CostAnalyzer';
 import ContentAgentPage from '@/pages/ContentAgent';
+import TikTokInboxPage from '@/pages/admin/TikTokInbox';
 
 function CatchAll() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -185,6 +186,14 @@ function AppRoutes() {
           element={
             <AdminGuard>
               <EngineeringAgentTaskDetailPage />
+            </AdminGuard>
+          }
+        />
+        <Route
+          path="/admin/inbox/tiktok"
+          element={
+            <AdminGuard>
+              <TikTokInboxPage />
             </AdminGuard>
           }
         />

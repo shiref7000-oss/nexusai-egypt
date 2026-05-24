@@ -9,6 +9,16 @@ import { logAdminAudit, resolveAdminActorId } from '../services/adminAudit';
 import { displayPlan, updateAdminUser } from '../services/adminUserUpdate';
 import { paramStr } from '../utils/httpParam';
 import adminEngineeringAgentRoutes from './adminEngineeringAgent';
+import {
+  getConversations,
+  getMessages,
+  markConversationRead,
+  getUnreadCount,
+  saveAiSuggestion,
+  approveAiSuggestion,
+  markMessageSent,
+  getWorkerState,
+} from '../services/tiktokInboxDb';
 
 const router = Router();
 
@@ -766,6 +776,109 @@ router.get('/ai/providers', authenticate, requireRole('admin', 'superadmin'), as
   } catch (err: any) {
     logger.error('Admin AI providers error', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to load AI provider analytics' });
+  }
+});
+
+// ============================================================
+// TIKTOK INBOX
+// ============================================================
+
+// List all active conversations
+router.get('/inbox/tiktok/conversations', authenticate, requireRole('admin', 'superadmin'), async (_req: AuthenticatedRequest, res) => {
+  try {
+    const conversations = await getConversations();
+    res.json({ success: true, data: { conversations } });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to load conversations', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to load conversations' });
+  }
+});
+
+// Get messages for a conversation
+router.get('/inbox/tiktok/conversations/:id/messages', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const convId = parseInt(req.params.id, 10);
+    const messages = await getMessages(convId);
+    res.json({ success: true, data: { messages } });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to load messages', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to load messages' });
+  }
+});
+
+// Mark conversation as read
+router.post('/inbox/tiktok/conversations/:id/read', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const convId = parseInt(req.params.id, 10);
+    await markConversationRead(convId);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to mark read', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to mark conversation as read' });
+  }
+});
+
+// Save AI reply suggestion for a message
+router.post('/inbox/tiktok/messages/:id/suggest', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const msgId = parseInt(req.params.id, 10);
+    const { suggestion } = req.body;
+    if (!suggestion || typeof suggestion !== 'string') {
+      return res.status(400).json({ success: false, error: 'suggestion is required' });
+    }
+    await saveAiSuggestion(msgId, suggestion);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to save suggestion', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to save AI suggestion' });
+  }
+});
+
+// Approve an AI reply suggestion
+router.post('/inbox/tiktok/messages/:id/approve', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const msgId = parseInt(req.params.id, 10);
+    await approveAiSuggestion(msgId, req.user!.userId);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to approve', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to approve suggestion' });
+  }
+});
+
+// Mark message as sent
+router.post('/inbox/tiktok/messages/:id/send', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const msgId = parseInt(req.params.id, 10);
+    await markMessageSent(msgId);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to mark sent', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to mark message as sent' });
+  }
+});
+
+// Get inbox stats
+router.get('/inbox/tiktok/stats', authenticate, requireRole('admin', 'superadmin'), async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [unread, workerState, conversations] = await Promise.all([
+      getUnreadCount(),
+      getWorkerState(),
+      getConversations(),
+    ]);
+    res.json({
+      success: true,
+      data: {
+        unreadCount: unread,
+        conversationCount: conversations.length,
+        lastPollAt: workerState.lastPollAt,
+        sessionValid: workerState.sessionValid,
+        errorMessage: workerState.errorMessage,
+      },
+    });
+  } catch (err: any) {
+    logger.error('TikTok inbox: failed to load stats', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to load inbox stats' });
   }
 });
 

@@ -696,6 +696,84 @@ export const adminApi = {
     }),
 };
 
+// ── TikTok Inbox ──
+
+export interface TikTokConversation {
+  id: number;
+  tiktok_user_id: string;
+  tiktok_username: string;
+  tiktok_avatar_url: string | null;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TikTokMessage {
+  id: number;
+  conversation_id: number;
+  tiktok_message_id: string | null;
+  direction: 'incoming' | 'outgoing';
+  content: string;
+  read: boolean;
+  ai_suggestion: string | null;
+  ai_suggestion_approved: boolean | null;
+  approved_by: number | null;
+  sent: boolean;
+  created_at: string;
+}
+
+export interface TikTokInboxStats {
+  unreadCount: number;
+  conversationCount: number;
+  lastPollAt: string | null;
+  sessionValid: boolean;
+  errorMessage: string | null;
+}
+
+export const tikTokInboxApi = {
+  conversations: () =>
+    apiFetch<{ success: boolean; data: { conversations: TikTokConversation[] } }>(
+      adminPath('/inbox/tiktok/conversations')
+    ),
+
+  messages: (conversationId: number) =>
+    apiFetch<{ success: boolean; data: { messages: TikTokMessage[] } }>(
+      adminPath(`/inbox/tiktok/conversations/${conversationId}/messages`)
+    ),
+
+  markRead: (conversationId: number) =>
+    apiFetch<{ success: boolean }>(
+      adminPath(`/inbox/tiktok/conversations/${conversationId}/read`),
+      { method: 'POST' }
+    ),
+
+  saveSuggestion: (messageId: number, suggestion: string) =>
+    apiFetch<{ success: boolean }>(
+      adminPath(`/inbox/tiktok/messages/${messageId}/suggest`),
+      { method: 'POST', body: JSON.stringify({ suggestion }) }
+    ),
+
+  approveSuggestion: (messageId: number) =>
+    apiFetch<{ success: boolean }>(
+      adminPath(`/inbox/tiktok/messages/${messageId}/approve`),
+      { method: 'POST' }
+    ),
+
+  markSent: (messageId: number) =>
+    apiFetch<{ success: boolean }>(
+      adminPath(`/inbox/tiktok/messages/${messageId}/send`),
+      { method: 'POST' }
+    ),
+
+  stats: () =>
+    apiFetch<{ success: boolean; data: TikTokInboxStats }>(
+      adminPath('/inbox/tiktok/stats')
+    ),
+};
+
 /** Map UI plan label to API value (DB uses `starter` for Basic). */
 export function planToApi(plan: AdminPlan): string {
   if (plan === 'basic') return 'starter';
