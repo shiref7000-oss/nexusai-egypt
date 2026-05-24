@@ -228,14 +228,55 @@ export default function TikTokConnectPage() {
         <Card>
           <CardHeader
             title="Remote Browser — TikTok Login"
-            description="Click to interact. Type your credentials below. Log in manually. Your credentials are never stored."
+            description="Use the input below to type into TikTok fields. Click a field button first, then type and press Send."
           />
           <CardBody>
             <div className="space-y-3">
-              {/* Screenshot display */}
+              {/* Step 1: Focus a field */}
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 1 — Click a field to focus it</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="outline" onClick={() => handleFocusField('email')}>
+                  Click Email/Username
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleFocusField('password')}>
+                  Click Password
+                </Button>
+                <Button size="sm" variant="default" onClick={() => handleFocusField('login-button')}>
+                  Click Login
+                </Button>
+              </div>
+
+              {/* Step 2: Type and send */}
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 2 — Type into the focused field</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Type your username/password here..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleType();
+                  }}
+                  className="flex-1 h-10 rounded-md border-2 border-zinc-600 bg-zinc-900 px-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-400"
+                />
+                <Button size="sm" onClick={handleType} className="h-10 px-6">
+                  Send
+                </Button>
+              </div>
+
+              {/* Step 3: Navigation keys */}
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Step 3 — Use keyboard shortcuts</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleKey('Tab')}>Tab</Button>
+                <Button size="sm" variant="outline" onClick={() => handleKey('Enter')}>Enter</Button>
+                <Button size="sm" variant="outline" onClick={() => handleKey('Escape')}>Esc</Button>
+              </div>
+
+              {/* Screenshot display (below controls) */}
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider">Browser View</p>
               <div
                 className="relative border border-white/10 rounded-lg overflow-hidden bg-black cursor-crosshair"
-                style={{ aspectRatio: '1280/800', maxHeight: '60vh' }}
+                style={{ aspectRatio: '1280/800', maxHeight: '40vh' }}
                 onClick={handleScreenshotClick}
               >
                 {screenshot ? (
@@ -252,38 +293,8 @@ export default function TikTokConnectPage() {
                 )}
               </div>
 
-              {/* Form field helpers */}
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="outline" onClick={() => handleFocusField('email')}>
-                  Click Email/Username
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleFocusField('password')}>
-                  Click Password
-                </Button>
-                <Button size="sm" variant="default" onClick={() => handleFocusField('login-button')}>
-                  Click Login
-                </Button>
-              </div>
-
-              {/* Input controls */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Type here, then press Send..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleType();
-                  }}
-                  className="flex-1 h-9 rounded-md border border-white/10 bg-panel px-3 text-sm text-foreground placeholder:text-subtle focus:outline-none focus:border-white/20"
-                />
-                <Button size="sm" onClick={handleType}>Send</Button>
-                <Button size="sm" variant="outline" onClick={() => handleKey('Tab')}>Tab</Button>
-                <Button size="sm" variant="outline" onClick={() => handleKey('Enter')}>Enter</Button>
-                <Button size="sm" variant="outline" onClick={() => handleKey('Escape')}>Esc</Button>
-              </div>
-              <p className="text-xs text-subtle">
-                Use the buttons above to focus fields, then type below. After logging in, the session is detected automatically within ~3 seconds.
+              <p className="text-xs text-zinc-500">
+                After logging in, the session is detected automatically within ~3 seconds.
               </p>
             </div>
           </CardBody>
