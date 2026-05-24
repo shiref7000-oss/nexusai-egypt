@@ -30,15 +30,18 @@ export default function TikTokConnectPage() {
   const loginPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
 
-  // ── Batched typing: buffer keystrokes, flush every 300ms ──
+  // ── Batched typing: buffer never resets — sends full accumulated text ──
+  // Buffer accumulates ALL keystrokes since last "commit" (click/Enter/Tab).
+  // Flush sends the ENTIRE buffer. Buffer only resets on field change (click).
 
   const typeBuffer = useRef<string>('');
+  const lastSentText = useRef<string>('');
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushBuffer = useCallback(async () => {
     const text = typeBuffer.current;
-    typeBuffer.current = '';
-    if (!text) return;
+    if (!text || text === lastSentText.current) return;
+    lastSentText.current = text;
     try {
       await tikTokConnectApi.fill(text);
     } catch { /* */ }
@@ -46,9 +49,16 @@ export default function TikTokConnectPage() {
 
   const appendToBuffer = useCallback((char: string) => {
     typeBuffer.current += char;
+    // Debounce: send after 400ms pause, but keep text in buffer
     if (flushTimer.current) clearTimeout(flushTimer.current);
-    flushTimer.current = setTimeout(flushBuffer, 300);
+    flushTimer.current = setTimeout(flushBuffer, 400);
   }, [flushBuffer]);
+
+  const resetBuffer = useCallback(() => {
+    typeBuffer.current = '';
+    lastSentText.current = '';
+    if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
+  }, []);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -140,8 +150,9 @@ export default function TikTokConnectPage() {
 
   const handleViewerClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!status?.browserActive) return;
-    // Flush any pending text before clicking (user is changing fields)
-    flushBuffer();
+    // Flush pending text before clicking (user is changing fields), then reset buffer for new field
+    await flushBuffer();
+    resetBuffer();
     const rect = e.currentTarget.getBoundingClientRect();
     const scaleX = 1280 / rect.width;
     const scaleY = 800 / rect.height;
@@ -170,9 +181,11 @@ export default function TikTokConnectPage() {
     // Special keys — send immediately as single key press
     if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Backspace' || e.key === 'Escape') {
       e.preventDefault();
-      // Flush any pending text before sending the special key
-      flushBuffer();
+      // Flush pending text before the special key
+      await flushBuffer();
       try { await tikTokConnectApi.key(e.key); } catch { /* */ }
+      // Tab = field change, reset buffer for new field
+      if (e.key === 'Tab') resetBuffer();
       return;
     }
     if (e.key.startsWith('Arrow')) {

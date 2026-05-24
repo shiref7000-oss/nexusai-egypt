@@ -522,35 +522,79 @@ export async function pasteText(sessionId: number, text: string): Promise<void> 
   }, text);
 }
 
-// ── Batch fill: inserts text instantly into focused input (bypasses keyboard delay) ──
+// ── Batch fill: inserts text into focused input using React-compatible value setter ──
 
-export async function fillField(sessionId: number, text: string): Promise<void> {
+export async function fillField(sessionId: number, text: string): Promise<{ ok: boolean; actualLength: number; expectedLength: number }> {
   const session = activeSessions.get(sessionId);
   if (!session) throw new Error('Session not active');
-  await session.page.evaluate((t) => {
+
+  const result = await session.page.evaluate((t) => {
     // Find the currently focused element
-    let el = document.activeElement;
-    // If no input is focused, try to find the first visible input
+    let el: Element | null = document.activeElement;
     if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
       const inputs = document.querySelectorAll('input:not([type="hidden"]), textarea');
       for (const input of inputs) {
         if ((input as HTMLElement).offsetParent !== null) {
-          el = input as HTMLElement;
+          el = input;
           (el as HTMLElement).focus();
           break;
         }
       }
     }
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      // Set value directly — no keyboard simulation delay
-      el.value = t;
-      // Move cursor to end
-      el.selectionStart = el.selectionEnd = t.length;
-      // Dispatch events so TikTok's JS framework detects the change
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+      return { ok: false, actualLength: 0, expectedLength: t.length, error: 'no input focused' };
     }
+
+    // Use native value setter to trigger React's synthetic event system
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    )?.set;
+    const nativeTextareaValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype, 'value'
+    )?.set;
+
+    if (el instanceof HTMLInputElement && nativeInputValueSetter) {
+      nativeInputValueSetter.call(el, t);
+    } else if (el instanceof HTMLTextAreaElement && nativeTextareaValueSetter) {
+      nativeTextareaValueSetter.call(el, t);
+    } else {
+      (el as any).value = t;
+    }
+
+    // Dispatch events in the correct order for React/Vue frameworks
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    // Trigger React onChange
+    const tracker = (el as any)._valueTracker;
+    if (tracker) tracker.setValue('');
+
+    // Move cursor to end
+    el.selectionStart = el.selectionEnd = t.length;
+
+    return { ok: el.value === t, actualLength: el.value.length, expectedLength: t.length };
   }, text);
+
+  // Retry once if value didn't stick
+  if (!result.ok && result.actualLength !== result.expectedLength) {
+    await session.page.waitForTimeout(150);
+    const retry = await session.page.evaluate((t) => {
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )?.set;
+        if (nativeInputValueSetter) nativeInputValueSetter.call(el, t);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return { ok: el.value === t, actualLength: el.value.length, expectedLength: t.length };
+      }
+      return { ok: false, actualLength: 0, expectedLength: t.length };
+    }, text);
+    return retry;
+  }
+
+  return result;
 }
 
 // ── Shutdown ──
