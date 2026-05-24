@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusAI SaaS</title>
+    <link rel="stylesheet" id="nexusai-css" href="/legacy/assets/ai-platform.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      /** Hash-router path (e.g. #/workflows → /workflows) or pathname for non-hash URLs. */
+      function appPath() {
+        const hash = location.hash.replace(/^#\/?/, '/');
+        if (hash && hash !== '/') return hash.split('?')[0];
+        return location.pathname;
+      }
+
+      /** Vite SPA for all routes — legacy bundle disabled (separate auth/session). */
+      const useLegacy = false;
+      const useEcommerce = !useLegacy;
+
+      if (useEcommerce) {
+        document.getElementById('nexusai-css').href = '/assets/__ECOM_CSS__';
+        import('/assets/__ECOM_JS__');
+      } else {
+        import('/legacy/assets/ai-platform.js');
+      }
+    </script>
+  </body>
+</html>
