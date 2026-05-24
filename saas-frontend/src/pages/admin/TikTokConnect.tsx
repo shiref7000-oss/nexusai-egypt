@@ -30,6 +30,26 @@ export default function TikTokConnectPage() {
   const loginPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
 
+  // ── Batched typing: buffer keystrokes, flush every 300ms ──
+
+  const typeBuffer = useRef<string>('');
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushBuffer = useCallback(async () => {
+    const text = typeBuffer.current;
+    typeBuffer.current = '';
+    if (!text) return;
+    try {
+      await tikTokConnectApi.fill(text);
+    } catch { /* */ }
+  }, []);
+
+  const appendToBuffer = useCallback((char: string) => {
+    typeBuffer.current += char;
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = setTimeout(flushBuffer, 300);
+  }, [flushBuffer]);
+
   const loadStatus = useCallback(async () => {
     try {
       const [statusRes, auditRes] = await Promise.all([
@@ -71,6 +91,8 @@ export default function TikTokConnectPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (loginPollRef.current) clearInterval(loginPollRef.current);
+      if (flushTimer.current) clearTimeout(flushTimer.current);
+      flushBuffer();
     };
   }, [loadStatus]);
 
@@ -118,6 +140,8 @@ export default function TikTokConnectPage() {
 
   const handleViewerClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!status?.browserActive) return;
+    // Flush any pending text before clicking (user is changing fields)
+    flushBuffer();
     const rect = e.currentTarget.getBoundingClientRect();
     const scaleX = 1280 / rect.width;
     const scaleY = 800 / rect.height;
@@ -137,58 +161,49 @@ export default function TikTokConnectPage() {
     try { await tikTokConnectApi.scroll(e.deltaY); } catch { /* */ }
   };
 
-  // ── Direct keyboard capture ──
+  // ── Direct keyboard capture (batched for low latency) ──
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!status?.browserActive) return;
     e.stopPropagation();
 
-    // Handle special keys
-    if (e.key === 'Enter') {
+    // Special keys — send immediately as single key press
+    if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Backspace' || e.key === 'Escape') {
       e.preventDefault();
-      try { await tikTokConnectApi.key('Enter'); } catch { /* */ }
+      // Flush any pending text before sending the special key
+      flushBuffer();
+      try { await tikTokConnectApi.key(e.key); } catch { /* */ }
       return;
     }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      try { await tikTokConnectApi.key('Tab'); } catch { /* */ }
-      return;
-    }
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      try { await tikTokConnectApi.key('Backspace'); } catch { /* */ }
-      return;
-    }
-    if (e.key === 'Escape') {
-      try { await tikTokConnectApi.key('Escape'); } catch { /* */ }
-      return;
-    }
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (e.key.startsWith('Arrow')) {
+      flushBuffer();
       try { await tikTokConnectApi.key(e.key); } catch { /* */ }
       return;
     }
 
-    // Ctrl+V paste
+    // Ctrl+V paste — send full clipboard text instantly
     if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
       e.preventDefault();
+      flushBuffer();
       try {
         const text = await navigator.clipboard.readText();
-        if (text) await tikTokConnectApi.paste(text);
+        if (text) await tikTokConnectApi.fill(text);
       } catch { /* */ }
       return;
     }
 
-    // Ctrl+A select all
+    // Ctrl+A — send as key combo
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
+      flushBuffer();
       try { await tikTokConnectApi.key('Control+a'); } catch { /* */ }
       return;
     }
 
-    // Forward printable characters
+    // Printable characters — buffer them, send in batches
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
-      try { await tikTokConnectApi.type(e.key); } catch { /* */ }
+      appendToBuffer(e.key);
     }
   };
 

@@ -885,6 +885,12 @@ export const tikTokConnectApi = {
       { method: 'POST', body: JSON.stringify({ text }) }
     ),
 
+  fill: (text: string) =>
+    apiFetch<{ success: boolean }>(
+      adminPath('/tiktok/fill'),
+      { method: 'POST', body: JSON.stringify({ text }) }
+    ),
+
   checkLogin: () =>
     apiFetch<{ success: boolean; data: { loggedIn: boolean; username: string | null; url: string } }>(
       adminPath('/tiktok/check-login')

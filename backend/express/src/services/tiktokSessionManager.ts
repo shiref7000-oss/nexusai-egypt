@@ -522,6 +522,37 @@ export async function pasteText(sessionId: number, text: string): Promise<void> 
   }, text);
 }
 
+// ── Batch fill: inserts text instantly into focused input (bypasses keyboard delay) ──
+
+export async function fillField(sessionId: number, text: string): Promise<void> {
+  const session = activeSessions.get(sessionId);
+  if (!session) throw new Error('Session not active');
+  await session.page.evaluate((t) => {
+    // Find the currently focused element
+    let el = document.activeElement;
+    // If no input is focused, try to find the first visible input
+    if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+      const inputs = document.querySelectorAll('input:not([type="hidden"]), textarea');
+      for (const input of inputs) {
+        if ((input as HTMLElement).offsetParent !== null) {
+          el = input as HTMLElement;
+          (el as HTMLElement).focus();
+          break;
+        }
+      }
+    }
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      // Set value directly — no keyboard simulation delay
+      el.value = t;
+      // Move cursor to end
+      el.selectionStart = el.selectionEnd = t.length;
+      // Dispatch events so TikTok's JS framework detects the change
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, text);
+}
+
 // ── Shutdown ──
 
 export async function shutdownAllSessions(): Promise<void> {

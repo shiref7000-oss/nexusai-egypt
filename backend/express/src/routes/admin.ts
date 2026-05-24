@@ -35,6 +35,7 @@ import {
   clearCookies,
   scrollPage,
   pasteText,
+  fillField,
   checkLoginStatus,
   saveSessionAfterLogin,
   disconnectSession,
@@ -1089,6 +1090,20 @@ router.post('/tiktok/paste', authenticate, requireRole('admin', 'superadmin'), a
     const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await pasteText(status.sessionId, text);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Batch fill: inserts entire text into focused input instantly (low latency)
+router.post('/tiktok/fill', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { text } = req.body;
+    if (typeof text !== 'string') return res.status(400).json({ success: false, error: 'text is required' });
+    const status = await getSessionStatus(req.user!.pgUserId);
+    if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
+    await fillField(status.sessionId, text);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
