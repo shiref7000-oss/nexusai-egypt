@@ -31,8 +31,8 @@ import {
   disconnectSession,
   getSessionStatus,
   checkSessionHealth,
-  getAuditEvents,
 } from '../services/tiktokSessionManager';
+import { getAuditEvents } from '../services/tiktokSessionDb';
 
 const router = Router();
 
@@ -852,7 +852,7 @@ router.post('/inbox/tiktok/messages/:id/suggest', authenticate, requireRole('adm
 router.post('/inbox/tiktok/messages/:id/approve', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
     const msgId = parseInt(req.params.id, 10);
-    await approveAiSuggestion(msgId, req.user!.userId);
+    await approveAiSuggestion(msgId, req.user!.pgUserId);
     res.json({ success: true });
   } catch (err: any) {
     logger.error('TikTok inbox: failed to approve', { error: err.message });
@@ -903,7 +903,7 @@ router.get('/inbox/tiktok/stats', authenticate, requireRole('admin', 'superadmin
 // Get session status
 router.get('/tiktok/session', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     res.json({ success: true, data: status });
   } catch (err: any) {
     logger.error('TikTok connect: session status error', { error: err.message });
@@ -914,7 +914,7 @@ router.get('/tiktok/session', authenticate, requireRole('admin', 'superadmin'), 
 // Start TikTok connect — launches browser
 router.post('/tiktok/connect', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const { sessionId, screenshot, currentUrl } = await createSession(req.user!.userId);
+    const { sessionId, screenshot, currentUrl } = await createSession(req.user!.pgUserId);
     res.json({ success: true, data: { sessionId, screenshot, currentUrl } });
   } catch (err: any) {
     logger.error('TikTok connect: launch failed', { error: err.message });
@@ -925,7 +925,7 @@ router.post('/tiktok/connect', authenticate, requireRole('admin', 'superadmin'),
 // Get live screenshot of browser
 router.get('/tiktok/screenshot', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) {
       return res.json({ success: true, data: { screenshot: '', currentUrl: '' } });
     }
@@ -941,7 +941,7 @@ router.get('/tiktok/screenshot', authenticate, requireRole('admin', 'superadmin'
 router.post('/tiktok/click', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
     const { x, y } = req.body;
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await sendClick(status.sessionId, x, y);
     res.json({ success: true });
@@ -954,7 +954,7 @@ router.post('/tiktok/click', authenticate, requireRole('admin', 'superadmin'), a
 router.post('/tiktok/type', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
     const { text } = req.body;
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await sendType(status.sessionId, text);
     res.json({ success: true });
@@ -967,7 +967,7 @@ router.post('/tiktok/type', authenticate, requireRole('admin', 'superadmin'), as
 router.post('/tiktok/key', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
     const { key } = req.body;
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.status(400).json({ success: false, error: 'No active session' });
     await sendKey(status.sessionId, key);
     res.json({ success: true });
@@ -979,7 +979,7 @@ router.post('/tiktok/key', authenticate, requireRole('admin', 'superadmin'), asy
 // Check if user completed login
 router.get('/tiktok/check-login', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.json({ success: true, data: { loggedIn: false, username: null } });
     const loginStatus = await checkLoginStatus(status.sessionId);
     if (loginStatus.loggedIn) {
@@ -994,7 +994,7 @@ router.get('/tiktok/check-login', authenticate, requireRole('admin', 'superadmin
 // Disconnect session
 router.post('/tiktok/disconnect', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    await disconnectSession(req.user!.userId);
+    await disconnectSession(req.user!.pgUserId);
     res.json({ success: true, message: 'Session disconnected' });
   } catch (err: any) {
     logger.error('TikTok connect: disconnect error', { error: err.message });
@@ -1005,7 +1005,7 @@ router.post('/tiktok/disconnect', authenticate, requireRole('admin', 'superadmin
 // Health check for active session
 router.post('/tiktok/health-check', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const status = await getSessionStatus(req.user!.userId);
+    const status = await getSessionStatus(req.user!.pgUserId);
     if (!status.sessionId) return res.json({ success: true, data: { healthy: false } });
     const healthy = await checkSessionHealth(status.sessionId);
     res.json({ success: true, data: { healthy } });
@@ -1017,7 +1017,7 @@ router.post('/tiktok/health-check', authenticate, requireRole('admin', 'superadm
 // Audit log
 router.get('/tiktok/audit', authenticate, requireRole('admin', 'superadmin'), async (req: AuthenticatedRequest, res) => {
   try {
-    const events = await getAuditEvents(req.user!.userId);
+    const events = await getAuditEvents(req.user!.pgUserId);
     res.json({ success: true, data: { events } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Failed to load audit log' });
